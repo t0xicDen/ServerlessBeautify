@@ -1,0 +1,79 @@
+﻿@using Newtonsoft.Json.Linq;
+@using Newtonsoft.Json;
+@using System.Text.RegularExpressions;
+@using CurrieTechnologies.Razor.Clipboard
+
+@inject ClipboardService clipboard
+
+<h3>Beautifier</h3>
+
+<textarea class="form-control" rows="15" aria-label="Input text" @bind="_inputText"></textarea>
+
+<button class="btn btn-primary" @onclick="Beautify">Beautify</button>
+<button class="btn btn-primary" @onclick="Minify">Minify</button>
+
+<div>
+    <pre>
+
+        @((MarkupString)_beutifiedHighlitedText)
+    </pre>
+    <button class="btn btn-primary" @onclick="(async e => await OnCopyClick())">Copy</button>
+</div>
+
+@code {
+
+    private string _inputText;
+    private string _beutifiedText;
+    private string _beutifiedHighlitedText;
+
+    public void Beautify()
+    {
+        JToken parsedValue = JToken.Parse(_inputText);
+
+        _beutifiedText = parsedValue.ToString(Formatting.Indented);
+        _beutifiedHighlitedText = Environment.NewLine + SyntaxHighlightJson(parsedValue.ToString(Formatting.Indented));
+    }
+
+    public void Minify()
+    {
+        JToken parsedValue = JToken.Parse(_inputText);
+
+        _beutifiedText = parsedValue.ToString(Formatting.None);
+    }
+
+    public string SyntaxHighlightJson(string original)
+    {
+        return Regex.Replace(
+          original,
+          @"(¤(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\¤])*¤(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)".Replace('¤', '"'),
+          match =>
+          {
+              var cls = "number";
+              if (Regex.IsMatch(match.Value, @"^¤".Replace('¤', '"')))
+              {
+                  if (Regex.IsMatch(match.Value, ":$"))
+                  {
+                      cls = "key";
+                  }
+                  else
+                  {
+                      cls = "string";
+                  }
+              }
+              else if (Regex.IsMatch(match.Value, "true|false"))
+              {
+                  cls = "boolean";
+              }
+              else if (Regex.IsMatch(match.Value, "null"))
+              {
+                  cls = "null";
+              }
+              return "<span class=\"" + cls + "\">" + match + "</span>";
+          });
+    }
+
+    public async Task OnCopyClick()
+    {
+        await clipboard.WriteTextAsync(_beutifiedText);
+    }
+}
